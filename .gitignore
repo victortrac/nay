@@ -1,0 +1,9 @@
+# Compiled binary
+/nay
+
+# Go test/coverage artifacts
+*.test
+*.out
+
+# OS files
+.DS_Store
