@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet and test
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Compute release version
+        id: version
+        run: |
+          BASE_VERSION=$(sed -n 's/^var version = "\([^"]*\)"/\1/p' cmd/nay/main.go)
+          BASE_VERSION="${BASE_VERSION:-0.1.0}"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${BASE_VERSION}-r${COMMIT_COUNT}.${SHORT_SHA}"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            stage="dist/stage-${arch}"
+            mkdir -p "${stage}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build \
+              -trimpath \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o "${stage}/nay" \
+              ./cmd/nay
+            cp README.md "${stage}/"
+            tar -C "${stage}" -czf "dist/nay-linux-${arch}.tar.gz" nay README.md
+            rm -rf "${stage}"
+          done
+          (cd dist && sha256sum nay-linux-*.tar.gz > checksums.txt)
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/nay-linux-*.tar.gz dist/checksums.txt --clobber
+          else
+            gh release create "$TAG" \
+              dist/nay-linux-*.tar.gz \
+              dist/checksums.txt \
+              --title "$TAG" \
+              --target "$GITHUB_SHA" \
+              --generate-notes
+          fi
