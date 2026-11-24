@@ -1,4 +1,4 @@
-# `nay`
+# `nay` - Not Another Yaourt
 
 **Say *nay* to malicious AUR packages.**
 
