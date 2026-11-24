@@ -126,7 +126,7 @@ nay doctor
 
 ## Configuration
 
-`nay` reads its configuration from `~/.config/nay/config.toml` (generated via `nay config init`). API keys can be provided via environment variables so you never have to hardcode secrets.
+`nay` reads its configuration from `~/.config/nay/config.toml` (generated via `nay config init`). API keys can be provided either via an environment variable (`api_key_env`) or directly in the config file (`api_key`). If both are set, `api_key` takes precedence—make sure to restrict file permissions (e.g., `chmod 600 ~/.config/nay/config.toml`) when storing a key directly.
 
 ```toml
 # AUR helper backend: "yay" or "paru"
@@ -150,6 +150,9 @@ model = "gpt-4.1-mini"
 
 # Name of the environment variable holding your API key
 api_key_env = "OPENAI_API_KEY"
+
+# Optional direct API key (takes precedence over api_key_env; chmod 600 this file if used)
+# api_key = ""
 ```
 
 ### Provider Examples
@@ -204,8 +207,6 @@ api_key_env = "ANTHROPIC_API_KEY"
 ---
 
 ## Installation
-
-> **Status:** Design complete — implementation in Go is in progress.
 
 Once built, `nay` compiles to a single static Go binary:
 
